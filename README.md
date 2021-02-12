@@ -12,4 +12,5 @@
   
 # R Project:
   1.heartdisease
-
+  
+  2.Fashion MNIST
