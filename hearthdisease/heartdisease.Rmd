@@ -1,0 +1,157 @@
+---
+title: "hearthdisease"
+author: "Ming Shen"
+date: "11/17/2019"
+output: pdf_document
+---
+Load packages and datasets
+```{r}
+library(tidyverse)
+library(MASS)
+heart_Df <- read.csv("/Users/mingshen/Desktop/CSUEB/Fall 2020/Project/heartdisease/heart_cleveland_upload.csv", stringsAsFactors = TRUE)
+```
+
+Data cleaning
+```{r}
+## Check for missing Values
+colSums(is.na(heart_Df)) #=> colSums:0
+
+## Correctly convert variables to factors.
+for (var in names(heart_Df)) {
+  if(length(unique(heart_Df[[var]])) < 4) {
+    heart_Df[[var]] <- as.factor(heart_Df[[var]])
+  }
+}
+
+str(heart_Df)
+```
+Data visualizing
+```{r}
+## Outcome Variable
+heart_Df %>%
+  ggplot(aes(condition)) +
+  geom_bar() +
+  geom_label(stat = "count", aes(label = ..count..))
+```
+Top Distributions
+Here we will examine, basically, the circumstances of top performers or influences on the outcome variable.
+```{r}
+numericVars <- which(sapply(heart_Df, is.numeric))
+
+factorVars <- which(sapply(heart_Df, is.factor))
+
+cat('There are', length(numericVars), 'numeric variables, and', length(factorVars), 'categoric variables',"\n\n")
+names(factorVars)
+```
+Outcome of Heart Disease by Factor Variables
+```{r}
+### Sex: Stacked Bar Chart
+
+heart_Df %>%
+  ggplot(aes(x = factor(condition), fill = sex)) +
+  geom_bar(position = position_dodge(preserve = "single")) +
+  labs(x = "Heart Disease Outcome", title = "Heart Disease Distribution by Sex") +
+  geom_label(stat = "count", aes(label = ..count..))
+```
+Outcome of Heart Disease by Numeric Variables
+```{r}
+### Age: Mean/SEM Plots
+
+## Function to summarize the data by its categories and plot the Mean and Std. Error Plot.
+
+
+numeric_plot_data_function <- function(.data, var) {
+  .data %>%
+    # group by Outcome Variable
+    group_by(condition) %>% # {{outcome}}
+    # calculate means, standard deviations,
+    # standard errors, and 95% confidence 
+    # intervals by Outcome Variable
+    summarize(n = n(),
+              mean = mean({{var}}),
+              sd = sd({{var}}),
+              se = sd / sqrt(n),
+              ci = qt(0.975, df = n -1) * se,
+              .groups = "drop") %>%
+    # Plot the means and standard errors
+    ggplot(aes(x = factor(condition), y = mean, group = 1)) +
+    geom_point(size = 3) +
+    geom_line() +
+    xlab("Heart Condition") +
+    geom_errorbar(aes(ymin = mean - se,
+                      ymax = mean + se),
+                  width = .1)
+}
+  
+
+## Check
+numeric_plot_data_function(heart_Df, age)
+```
+Underlying Relationships
+Numeric Variables: Pairwise-Correlation
+Correlation plots help us to visualize the pairwise relationships between a set of quantitative variables by displaying their correlations using color or shading. It is important to know that this is applicable to only numeric Variables. Hence, we are checking for the pair relationship within our dataset, although we know the outcome variable is not numerically - we will get to that later.
+```{r}
+## Correlation Set
+
+numericVars <- select_if(heart_Df, is.numeric) # select only Column-set numeric vars
+
+corr <- cor(numericVars, use = "pairwise.complete.obs")
+round(corr, 2)
+
+## Correlation Visualisation
+library(ggcorrplot)
+
+ggcorrplot(corr, 
+           hc.order = TRUE, # reorders the variables, placing variables with similar correlation patterns together.
+           type = "lower", lab = TRUE)
+```
+Categorical Predictors On Categorical Outcome: ChiSquare
+Chi-square statistics is used to investigate whether distributions of categorical variables differ from one another. Chi-square test is also useful while comparing the tallies or counts of categorical responses between two(or more) independent groups.
+
+Our aim is to test the hypothesis whether the categorical predictor variable is independent of their heart Condition at .05 significance level.
+
+Where P-Value is > 0.05 we accept our hypothesis that the variables are independent and there is little or weak correlation between these variable, and vice versa.
+```{r}
+for (var in names(factorVars)) {
+  if (var != "condition"){
+    cat("+----------------------+")
+    cat("\n","Data Table for",var, "Variable","\n")
+    # contigency table
+    factor_hd <- table(heart_Df[[var]], heart_Df$condition)
+    cat("----------------------")
+    print(factor_hd)
+    cat("----------------------")
+    cat("\n","Chi Square Test @ 0.05")
+    # chiSq
+    print(chisq.test(factor_hd))
+    cat("+----------------------+","\n\n")
+  }
+  
+}
+```
+Numeric Predictor Variables on Categorical Outcome: Logistic Regression¶
+Naturally since the Outcome Variable is Boolean, the choice for analysing the influence of Numeric Predictors is by using Logistic Regression. Logistic regression can be used to explore the relationship between a binary response variable and an explanatory variable while other variables are held constant. Binary response variables have two levels (yes/no, lived/died, pass/fail, malignant/benign).
+
+```{r}
+heartDisease_glm <- glm(condition ~ age + cp + trestbps + chol + thalach + oldpeak + ca, 
+                 family = "binomial", 
+                 data = heart_Df)
+
+## Check
+heartDisease_glm
+
+```
+
+```{r}
+## Plot results
+library(visreg)
+visreg(heartDisease_glm, "age", 
+       gg = TRUE, 
+       scale="response") +
+  labs(y = "Prob(HeartDisease)", 
+       x = "Age",
+       title = "Relationship of age and Heart Condition",
+       subtitle = "controlling for age, cp, trestbps, chol, thalach, oldpeak and ca",
+       caption = "source: University of California, Irvine Library database")
+```
+
