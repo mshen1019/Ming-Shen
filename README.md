@@ -1,4 +1,15 @@
 # Ming-Shen
-# Love to play with data
-# I am new to Github
-# Uploading my projects now
+# Python Project:
+  1.Covid
+  
+  2.Digit Recognition
+  
+  3.Face Key Point Detection
+  
+  4.Red Wine Analysis
+  
+  5.Movie_recommendation
+  
+# R Project:
+  1.heartdisease
+
