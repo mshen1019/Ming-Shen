@@ -1,0 +1,163 @@
+---
+title: "Fashion Mnist"
+author: "Ming Shen"
+date: "4/24/2020"
+output: pdf_document
+---
+#Data Preparation
+```{r}
+categories <- c("T-shirt", "Trouser", "Pullover", "Dress", 
+    "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Boot")
+```
+#Load libraries and train/test dataset
+```{r}
+library(tidyverse) 
+library(keras)
+library(caret)
+fashion_train <- read_csv('/Users/mingshen/Desktop/CSUEB/Fall 2020/Project/Fashion_MNIST/fashion-mnist_train.csv')
+fashion_test <- read_csv('/Users/mingshen/Desktop/CSUEB/Fall 2020/Project/Fashion_MNIST/fashion-mnist_test.csv')
+```
+```{r}
+head(fashion_train)
+```
+#Convert the data into matrix
+```{r}
+train_m <- data.matrix(fashion_train)
+test_m <- data.matrix(fashion_test)
+```
+#Data split
+```{r}
+# Predictor variables in `train_m`
+train_x <-  train_m[,-1]
+# Predictor variables in `test_m`
+test_x <- test_m[,-1]
+# Target variables in `train_m`
+train_y <- train_m[,1]
+# Target variables in `test_m`
+test_y <- test_m[,1]
+```
+#Preprocessing input data
+```{r}
+# Flatten matrix
+train_x_array <- array_reshape(x= train_x, dim = dim(train_x))
+test_x_array <- array_reshape(x=test_x, dim = dim(test_x))
+# Feature Scaling
+train_x.keras <- train_x_array/255
+test_x.keras <- test_x_array/255
+# Output categorizing
+train_y.keras <- to_categorical(train_y)
+test_y.keras <- to_categorical(test_y)
+# CNN Input
+train_x_convolution.keras <- array_reshape(x= train_x.keras, dim = c(60000,28,28,1))
+test_x_convolution.keras <- array_reshape(x= test_x.keras, dim = c(10000,28,28,1))
+```
+#Build Model 
+model_init
+```{r}
+model <- keras_model_sequential()
+set.seed(100)
+initializer <- initializer_random_normal(seed = 100)
+model_init <- keras_model_sequential() %>% 
+  layer_dense(units = 32, activation = "relu", input_shape = ncol(train_x.keras),
+              kernel_initializer = initializer, bias_initializer = initializer) %>% 
+  layer_dense(units = 32, activation = "relu",
+              kernel_initializer = initializer, bias_initializer = initializer) %>% 
+  layer_dense(units = 10, activation = "softmax", 
+              kernel_initializer = initializer, bias_initializer = initializer)
+```
+model_bigger 
+```{r}
+model_bigger <- keras_model_sequential() %>% 
+  layer_dense(units = 512, activation = "relu", input_shape = ncol(train_x.keras),
+              kernel_initializer = initializer, bias_initializer = initializer) %>% 
+  layer_dense(units = 512, activation = "relu",
+              kernel_initializer = initializer, bias_initializer = initializer) %>% 
+  layer_dense(units = 10, activation = "softmax", 
+              kernel_initializer = initializer, bias_initializer = initializer)
+```
+model convolution
+```{r}
+model_convolution <- keras_model_sequential() %>% 
+  layer_conv_2d(filters = 24, kernel_size = c(3,3), padding='same', activation = "relu", 
+                input_shape = c(28,28,1)) %>% 
+  layer_conv_2d(filters = 24, kernel_size = c(3,3), padding='same', activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2,2), strides=2) %>% 
+  layer_dropout(0.4)%>%
+  layer_conv_2d(filters = 48, kernel_size = c(3,3), padding='same', activation = "relu") %>% 
+  layer_conv_2d(filters = 48, kernel_size = c(3,3), padding='same', activation = "relu") %>%
+  layer_max_pooling_2d(pool_size = c(2,2)) %>%
+  layer_dropout(0.4)%>%
+  layer_flatten()%>%
+  layer_dense(units = 256, activation = "relu",
+              kernel_initializer = initializer, bias_initializer = initializer)%>%
+  layer_dropout(0.5)%>%
+  layer_dense(10,activation="softmax")
+```
+
+#Define cost function and optimizer
+```{r}
+model_init %>% 
+  compile(loss = "categorical_crossentropy", 
+          optimizer = optimizer_adam(lr = 0.001), 
+          metrics = "accuracy")
+model_bigger %>% 
+  compile(loss = "categorical_crossentropy", 
+          optimizer = optimizer_adam(lr = 0.001), 
+          metrics = "accuracy")
+model_convolution %>% 
+  compile(loss = "categorical_crossentropy", 
+          optimizer = optimizer_adam(lr = 0.001), 
+          metrics = "accuracy")
+```
+#Train models
+```{r}
+history_init <- model_init %>%
+  fit(train_x.keras, train_y.keras, epoch = 10, batch_size = 100)
+history_bigger <- model_bigger %>% 
+  fit(train_x.keras, train_y.keras, epoch = 10, batch_size = 100)
+```
+```{r}
+history_convolution <- model_convolution %>% 
+  fit(train_x_convolution.keras , train_y.keras , epoch = 10, batch_size = 100)
+```
+#Predicting on test set
+```{r}
+pred_init <- keras::predict_classes(object = model_init, x= test_x.keras)
+
+pred_bigger <- keras::predict_classes(object = model_bigger, x= test_x.keras)
+
+pred_convolution <- keras::predict_classes(object = model_convolution(), x= test_x.keras)
+```
+#Evaluatin models
+```{r}
+decode <- function(data){
+  sapply(as.character(data), switch,
+       "0" = "T-Shirt",
+       "1" = "Trouser",
+       "2" = "Pullover",
+       "3" = "Dress",
+       "4" = "Coat",
+       "5" = "Sandal",
+       "6" = "Shirt",
+       "7" = "Sneaker",
+       "8" = "Bag",
+       "9" = "Boot")
+}
+```
+```{r}
+reference <- decode(test_y)
+pred_decode_in <- decode(pred_init)
+pred_decode_big <- decode(pred_bigger)
+pred_decode_convolution <-decode(pred_convolution)
+```
+#Plot Confusion Matrix
+```{r}
+confusionMatrix(as.factor(pred_decode_in), as.factor(reference))
+```
+```{r}
+confusionMatrix(as.factor(pred_decode_big), as.factor(reference)) 
+```
+```{r}
+confusionMatrix(as.factor(pred_decode_convolution), as.factor(reference)) 
+```
+
